@@ -1,0 +1,10 @@
+{
+  "name": "dorothys-books-netlify",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "engines": {"node": ">=20.12.2"},
+  "scripts": {"dev": "netlify dev", "check": "node --check netlify/functions/api.mjs && node --check backend/ledger.mjs && node --check public/app.js && node --check public/guide.js", "test": "node --test tests/*.test.mjs"},
+  "dependencies": {"@netlify/database":"latest"},
+  "devDependencies": {"netlify-cli":"^26.0.0"}
+}
