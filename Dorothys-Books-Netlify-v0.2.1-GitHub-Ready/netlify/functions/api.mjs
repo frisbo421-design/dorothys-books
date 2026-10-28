@@ -13,14 +13,43 @@ const cookie=(token='',maxAge=TTL)=>`db_session=${token}; Max-Age=${maxAge}; Pat
 const send=(data,status=200,more={})=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...more}});
 const isoToday=()=>L.today();
 async function getMe(c,req,required=true){const t=cookieValue(req,'db_session');if(!t){if(required)err('Please sign in.',401);return null}const u=await L.one(c,'SELECT u.id,u.email FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>$2',[sha(t),Math.floor(Date.now()/1000)]);if(!u&&required)err('Session expired. Please sign in again.',401);return u}
-async function getCompany(c,req,me){const id=Number(req.headers.get('x-company-id')||'0');if(!Number.isSafeInteger(id)||id<=0)err('Select your company.',403);const co=await L.one(c,'SELECT * FROM companies WHERE id=$1 AND owner_id=$2',[id,me.id]);if(!co)err('Select your company.',403);return co}
+async function getCompany(c,req,me){const id=Number(req.headers.get('x-company-id')||'0');if(!Number.isSafeInteger(id)||id<=0)err('Select your company.',403);const co=await L.one(c,`SELECT c.*, CASE WHEN c.owner_id=$2 THEN 'admin' ELSE m.role END AS access_role FROM companies c LEFT JOIN company_memberships m ON m.company_id=c.id AND m.user_id=$2 WHERE c.id=$1 AND (c.owner_id=$2 OR m.user_id=$2)`,[id,me.id]);if(!co)err('Select your company.',403);return co}
 function checkPost(req){if(req.headers.get('x-requested-with')!=='DorothysBooks')err('Request verification missing.',403);const origin=req.headers.get('origin');if(!origin||origin!==new URL(req.url).origin)err('Request origin rejected.',403);const type=req.headers.get('content-type')||'';if(!type.toLowerCase().includes('application/json'))err('Expected JSON data.',415);}
 const setupKey=()=>Netlify.env.get('BOOKS_SETUP_KEY')||process.env.BOOKS_SETUP_KEY||'';
 const eqHash=(a,b)=>timingSafeEqual(Buffer.from(sha(a),'hex'),Buffer.from(sha(b),'hex'));
 async function register(c,d){const requiredKey=setupKey();if(!requiredKey||requiredKey.length<16)err('Setup is disabled until the site owner sets BOOKS_SETUP_KEY in Netlify site environment variables (at least 16 characters).',503);if(!eqHash(String(d.setup_key||''),requiredKey))err('Invalid owner setup code.',403);const email=String(d.email||'').trim().toLowerCase(),pwd=String(d.password||'');if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||pwd.length<10)err('Enter a valid email and a password of at least 10 characters.');
- // Single-owner invariant is also enforced by users.owner_slot UNIQUE.
+ // Initial administrator is created exactly once; invited owners use the separate accept flow.
  const already=await L.one(c,'SELECT id FROM users LIMIT 1');if(already)err('An owner account already exists. Please sign in.',403);
  const u=await L.one(c,'INSERT INTO users(email,password_hash) VALUES($1,$2) RETURNING id',[email,passhash(pwd)]);const cid=await L.createCompany(c,u.id,"Dorothy's Petcare");await L.audit(c,cid,u.id,'company.create',"Dorothy's Petcare");return u.id;}
+
+async function createInvite(c,co,me,d){
+ if(!['admin','owner'].includes(co.access_role))err('You cannot invite team members.',403);
+ if(co.demo)err('Switch to the live company before inviting an owner.',400);
+ const email=String(d.email||'').trim().toLowerCase();
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254)err('Enter the intended owner’s valid email address.');
+ const existing=await L.one(c,'SELECT id FROM users WHERE email=$1',[email]);
+ if(existing)err('This address already has an account. Contact the administrator to manage its access.',409);
+ const token=randomBytes(32).toString('base64url');
+ await c.query('UPDATE company_invitations SET expires_at=now() WHERE company_id=$1 AND email=$2 AND accepted_at IS NULL',[co.id,email]);
+ await c.query('INSERT INTO company_invitations(company_id,email,role,token_hash,created_by) VALUES($1,$2,$3,$4,$5)',[co.id,email,'owner',sha(token),me.id]);
+ await L.audit(c,co.id,me.id,'team.invite','Invited '+email+' as business owner');
+ return {email,role:'owner',invite_token:token,expires_in_days:7};
+}
+async function acceptInvite(c,d){
+ const token=String(d.token||''),email=String(d.email||'').trim().toLowerCase(),password=String(d.password||'');
+ if(token.length<32||token.length>200)err('This invitation link is invalid. Request a new link.',403);
+ if(password.length<10||password.length>1024)err('Choose a password between 10 and 1024 characters.');
+ const invite=await L.one(c,'SELECT * FROM company_invitations WHERE token_hash=$1 AND accepted_at IS NULL AND expires_at>now() FOR UPDATE',[sha(token)]);
+ if(!invite||invite.email!==email)err('This invitation is invalid, expired, or intended for another email address.',403);
+ const duplicate=await L.one(c,'SELECT id FROM users WHERE email=$1',[email]);
+ if(duplicate)err('An account already exists for this address. Please sign in instead.',409);
+ const created=await L.one(c,'INSERT INTO users(email,password_hash) VALUES($1,$2) RETURNING id',[email,passhash(password)]);
+ await c.query('INSERT INTO company_memberships(company_id,user_id,role) VALUES($1,$2,$3)',[invite.company_id,created.id,invite.role]);
+ await c.query('UPDATE company_invitations SET accepted_at=now() WHERE id=$1',[invite.id]);
+ await L.audit(c,invite.company_id,created.id,'team.join',email+' joined as '+invite.role);
+ return created.id;
+}
+
 async function createSession(c,user){const token=randomBytes(36).toString('base64url');await c.query('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES($1,$2,$3)',[sha(token),user,Math.floor(Date.now()/1000)+TTL]);return cookie(token)}
 async function report(c,co,url){const kind=url.searchParams.get('kind')||'pnl',end=url.searchParams.get('end')||isoToday(),start=url.searchParams.get('start')||end.slice(0,7)+'-01';if(kind==='pnl')return L.pnl(c,co.id,start,end);if(kind==='balance')return L.balanceSheet(c,co.id,end);if(kind==='trial')return {entries:await L.trial(c,co.id,end),as_of:L.iso(end)};if(kind==='general')return {entries:await L.rows(c,`SELECT j.id,j.date,j.memo,j.source_type,a.code,a.name AS account,a.type,l.debit,l.credit FROM journal_entries j JOIN journal_lines l ON l.entry_id=j.id JOIN accounts a ON a.id=l.account_id WHERE j.company_id=$1 AND j.date BETWEEN $2 AND $3 ORDER BY j.date DESC,j.id DESC,l.id`,[co.id,L.iso(start),L.iso(end)]),start,end};err('Unknown report type.')}
 function csvValue(x){let s=String(x??'');if(/^[=+@\-\t\r]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"'}
@@ -46,7 +75,7 @@ async function handle(req){const url=new URL(req.url);const path=url.pathname.re
  try{
   const me=await getMe(c,req,false);
   if(method==='GET'&&path==='/bootstrap'){
-   const count=await L.one(c,'SELECT count(*) AS n FROM users');const companies=me?await L.rows(c,'SELECT id,name,demo,locked_through FROM companies WHERE owner_id=$1 ORDER BY demo,id',[me.id]):[];return send({setup:Number(count.n)===0,user:me,companies});
+   const count=await L.one(c,'SELECT count(*) AS n FROM users');const companies=me?await L.rows(c,`SELECT c.id,c.name,c.demo,c.locked_through, CASE WHEN c.owner_id=$1 THEN 'admin' ELSE m.role END AS access_role FROM companies c LEFT JOIN company_memberships m ON m.company_id=c.id AND m.user_id=$1 WHERE c.owner_id=$1 OR m.user_id=$1 ORDER BY c.demo,c.id`,[me.id]):[];return send({setup:Number(count.n)===0,user:me,companies});
   }
   if(method==='POST'&&path==='/auth/register'){
    await c.query('BEGIN');inTx=true;const d=(await req.json()).data||{};const user=await register(c,d);const token=await createSession(c,user);await c.query('COMMIT');inTx=false;return send({ok:true},200,{'Set-Cookie':token});
@@ -54,6 +83,9 @@ async function handle(req){const url=new URL(req.url);const path=url.pathname.re
   if(method==='POST'&&path==='/auth/login'){
    const d=(await req.json()).data||{};const user=await L.one(c,'SELECT * FROM users WHERE email=$1',[String(d.email||'').trim().toLowerCase()]);if(!user||!passwordOk(String(d.password||''),user.password_hash))err('Incorrect email or password.',401);
    const token=await createSession(c,user.id);return send({ok:true},200,{'Set-Cookie':token});
+  }
+  if(method==='POST'&&path==='/auth/invite/accept'){
+   await c.query('BEGIN');inTx=true;const d=(await req.json()).data||{};const user=await acceptInvite(c,d);const token=await createSession(c,user);await c.query('COMMIT');inTx=false;return send({ok:true},200,{'Set-Cookie':token});
   }
   if(method==='POST'&&path==='/auth/logout'){
    const t=cookieValue(req,'db_session');if(t)await c.query('DELETE FROM sessions WHERE token_hash=$1',[sha(t)]);return send({ok:true},200,{'Set-Cookie':cookie('',0)});
@@ -70,6 +102,14 @@ async function handle(req){const url=new URL(req.url);const path=url.pathname.re
    await L.audit(c,co,me.id,'demo.create','FAKE SAMPLE RECORDS — DO NOT USE FOR LIVE BOOKS');await c.query('COMMIT');inTx=false;return send({id:co});
   }
   const co=await getCompany(c,req,me);
+  if(method==='GET'&&path==='/team'){
+   const members=await L.rows(c,"SELECT u.email, 'admin' AS role FROM users u WHERE u.id=$1 UNION ALL SELECT u.email,m.role FROM company_memberships m JOIN users u ON u.id=m.user_id WHERE m.company_id=$2 ORDER BY role,email",[co.owner_id,co.id]);
+   const invites=await L.rows(c,'SELECT email,role,created_at,expires_at FROM company_invitations WHERE company_id=$1 AND accepted_at IS NULL AND expires_at>now() ORDER BY created_at DESC LIMIT 30',[co.id]);
+   return send({members,invites});
+  }
+  if(method==='POST'&&path==='/team/invite'){
+   await c.query('BEGIN');inTx=true;const d=(await req.json()).data||{};const result=await createInvite(c,co,me,d);await c.query('COMMIT');inTx=false;return send(result);
+  }
   if(method==='GET'&&path==='/state'){
    const dashboard=await L.dashboard(c,co.id);return send({company:co,accounts:await L.rows(c,'SELECT * FROM accounts WHERE company_id=$1 ORDER BY code',[co.id]),contacts:await L.rows(c,'SELECT * FROM contacts WHERE company_id=$1 ORDER BY name',[co.id]),dashboard,journals:await L.journals(c,co.id,250),invoices:await L.allInvoices(c,co.id),bills:await L.allBills(c,co.id),bank_lines:await L.bankLines(c,co.id),reconciliations:await L.rows(c,'SELECT r.*,a.name AS account_name FROM reconciliations r JOIN accounts a ON a.id=r.bank_account_id WHERE r.company_id=$1 ORDER BY r.id DESC',[co.id]),insights:await L.insights(c,co.id,dashboard)});
   }
