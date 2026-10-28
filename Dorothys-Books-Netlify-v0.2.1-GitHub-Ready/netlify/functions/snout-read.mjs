@@ -29,7 +29,7 @@ export default async function handler(req) {
   if(!authorization.startsWith('Bearer ')) return friendlyError(401,'AUTH_REQUIRED','Sign in to Snout with an authorized account.');
   let decoded;
   try {
-    decoded=await getAuth(firebase()).verifyIdToken(authorization.slice(7),true);
+    decoded=await getAuth(firebase()).verifyIdToken(authorization.slice(7));
   } catch {
     return friendlyError(401,'AUTH_INVALID','Snout sign-in expired or could not be verified.');
   }
