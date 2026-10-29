@@ -1,6 +1,6 @@
 {
   "name": "dorothys-books-netlify",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "netlify dev",
-    "check": "node --check netlify/functions/api.mjs && node --check backend/ledger.mjs && node --check public/app.js && node --check public/guide.js && node --check public/team.js && node --check netlify/functions/snout-read.mjs && node --check public/fik-books-motion.js && node --check scripts/prepare-fik-vendor.mjs",
+    "check": "node --check netlify/functions/api.mjs && node --check backend/ledger.mjs && node --check public/app.js && node --check public/guide.js && node --check public/team.js && node --check netlify/functions/snout-read.mjs && node --check public/fik-books-motion.js && node --check scripts/prepare-fik-vendor.mjs && node --check backend/close-and-match.mjs && node --check public/close-match.js",
     "test": "node --test tests/*.test.mjs",
     "vendor:prepare": "node scripts/prepare-fik-vendor.mjs"
   },
