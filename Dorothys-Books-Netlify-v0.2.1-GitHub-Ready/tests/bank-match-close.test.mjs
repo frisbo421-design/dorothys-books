@@ -60,6 +60,8 @@ test('Month close readiness blocks all unresolved historical statements through 
  assert.equal(r.receivables.overdue_invoices,2);
  assert.ok(r.blockers.length>=2);assert.ok(r.warnings.length>=2);
  await assert.rejects(M.closeReadiness(c,7,'2026-09-29'),/last day of the month/);
+ const october=await M.closeReadiness(c,7,'2026-10-31');
+ assert.equal(october.through,'2026-10-31');
 });
 test('Close and match routes are authenticated and transactional',()=>{
  const api=read('../netlify/functions/api.mjs');
