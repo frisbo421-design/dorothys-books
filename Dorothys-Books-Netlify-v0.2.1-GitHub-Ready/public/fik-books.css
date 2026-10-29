@@ -118,3 +118,23 @@ body{background:var(--paper);font-feature-settings:"ss01" on}
 .existing-join[open] summary{margin-bottom:12px}
 .existing-join .auth-form{max-width:100%;box-shadow:none;border:0;padding:0}
 .existing-join .auth-form p{font-size:12px;color:var(--muted);line-height:1.6}
+
+/* Dorothy's Books v0.5: deliberate review before posting */
+.mm-queue .panel-head{align-items:center;flex-wrap:wrap}
+.mm-queue tbody tr:nth-child(2n){background:#fafbf9}
+.mm-queue td{max-width:430px;overflow:hidden;text-overflow:ellipsis}
+.mm-queue small{color:var(--muted)}
+.mm-close .panel-body{display:grid;justify-items:start;gap:12px}
+.mm-close .form-label{max-width:270px;width:100%}
+.mm-close-result{width:100%;max-width:830px;font-size:12px;color:var(--ink);line-height:1.7}
+.mm-close-result p{margin:7px 0}
+.mm-close-result ul{margin:9px 0 0;padding-left:18px}
+.mm-close-result li{margin:4px 0}
+.mm-close-result li.mm-block{color:#a33d31;font-weight:600}
+.mm-dialog{z-index:110;position:fixed}
+.mm-dialog .modal{max-width:880px;width:min(94vw,880px)}
+.mm-dialog .modal-inner{overflow-y:auto;max-height:60vh}
+.mm-dialog td{white-space:normal}
+.mm-ack{display:flex;align-items:flex-start;gap:10px;font-size:12px;line-height:1.6;margin:15px 0;color:#536a5d}
+.mm-ack input{margin-top:3px;min-width:16px;min-height:16px}
+@media(max-width:650px){.mm-dialog .modal{max-height:90vh}.mm-dialog td{font-size:11px;padding:8px 7px}.mm-close-result{font-size:11px}}
