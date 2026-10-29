@@ -101,6 +101,7 @@
   }
   function motion(){
     if(mq.matches||!window.gsap)return;
+    if(window.ScrollTrigger)window.gsap.registerPlugin(window.ScrollTrigger);
     const scope=document.querySelector('.shell .workspace');if(!scope)return;
     animationScope=window.gsap.context(()=>{
       window.gsap.from('.page-title h1',{y:14,opacity:0,duration:.48,ease:'power2.out',clearProps:'all'});
