@@ -36,6 +36,30 @@
     tick=(time)=>scroll?.raf(time*1000);
     window.gsap.ticker.add(tick);
   }
+  function reviewLane(){
+    if(section!=='overview'||!books?.dashboard)return;
+    const cards=document.querySelector('.shell .cards');
+    if(!cards||!cards.parentElement)return;
+    const d=books.dashboard;
+    const records=[
+      {label:'Bank lines to review',count:Math.max(0,numeric(d.unreviewed)),nav:'banking'},
+      {label:'Overdue invoices',count:Math.max(0,numeric(d.overdue_invoices)),nav:'sales'},
+      {label:'Overdue bills',count:Math.max(0,numeric(d.overdue_bills)),nav:'expenses'}
+    ];
+    const lane=document.createElement('section');lane.className='fik-review-lane';lane.setAttribute('aria-label','Accounting review queue');
+    const title=document.createElement('div');title.className='fik-review-title';
+    title.textContent='Needs your attention';
+    lane.append(title);
+    const list=document.createElement('div');list.className='fik-review-items';
+    for(const item of records){
+      const b=document.createElement('button');b.type='button';b.className='fik-review-item';
+      b.dataset.nav=item.nav;
+      const n=document.createElement('strong');n.textContent=String(item.count);
+      const label=document.createElement('span');label.textContent=item.label;
+      b.append(n,label);list.append(b);
+    }
+    lane.append(list);cards.after(lane);
+  }
   function tellStory(){
     const main=document.querySelector('.shell .content');
     if(!main||!books||!books.dashboard)return;
@@ -118,6 +142,7 @@
     const workspace=document.querySelector('.shell');if(!workspace)return;
     workspace.classList.add('fik-books-ui');
     tellStory();
+    reviewLane();
     mountChart();
     setupScroll();
     if(scroll){if(modal||mobileMenu)scroll.stop();else scroll.start()}
