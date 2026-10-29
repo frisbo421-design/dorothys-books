@@ -18,7 +18,7 @@ test('Visual refresh uses source data and never writes accounting transactions',
  assert.match(js,/window\.gsap\.ticker\.add/);
  assert.match(js,/scroll\.destroy\(\)/);
  assert.match(js,/data-nav|dataset\.nav/);
- assert.doesNotMatch(js,/fetch\(|localStorage|sessionStorage|POST|/);
+ assert.doesNotMatch(js,/fetch\(|localStorage|sessionStorage|method:\s*['"]POST/);
 });
 test('No breaking changes to multi-user company membership',()=>{
  const api=load('../netlify/functions/api.mjs');
