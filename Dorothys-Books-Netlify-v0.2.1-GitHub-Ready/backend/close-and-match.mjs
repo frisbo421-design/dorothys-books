@@ -59,6 +59,8 @@ export async function matchExisting(c,co,user,payload){
 }
 export async function closeReadiness(c,co,endDate){
  const end=L.iso(endDate);
+ const endDay=new Date(end+'T12:00:00Z');endDay.setUTCMonth(endDay.getUTCMonth()+1);endDay.setUTCDate(0);
+ if(end!==endDay.toISOString().slice(0,10))deny('Choose the last day of the month for month-end close.');
  const company=await L.one(c,'SELECT id,locked_through FROM companies WHERE id=$1',[co]);
  if(!company)deny('Company not found.');
  const periodStart=end.slice(0,7)+'-01';
@@ -66,8 +68,8 @@ export async function closeReadiness(c,co,endDate){
  const counts=await L.one(c,`SELECT
  COUNT(*) FILTER (WHERE entry_id IS NULL)::int AS unmatched,
  COUNT(*) FILTER (WHERE entry_id IS NOT NULL AND reconciliation_id IS NULL)::int AS uncleared,
- COUNT(*)::int AS imported
- FROM bank_lines WHERE company_id=$1 AND date BETWEEN $2 AND $3`,[co,periodStart,end]);
+ COUNT(*) FILTER (WHERE date BETWEEN $2 AND $3)::int AS imported
+ FROM bank_lines WHERE company_id=$1 AND date<=$3`,[co,periodStart,end]);
  const audit=await L.one(c,`SELECT count(*)::int AS reconciliations FROM reconciliations
  WHERE company_id=$1 AND end_date BETWEEN $2 AND $3`,[co,periodStart,end]);
  const outstanding=await L.one(c,`SELECT
