@@ -3,6 +3,7 @@
 import { getDatabase } from '@netlify/database';
 import { pbkdf2Sync, randomBytes, createHash, timingSafeEqual } from 'node:crypto';
 import * as L from '../../backend/ledger.mjs';
+import * as M from '../../backend/close-and-match.mjs';
 const TTL=14*24*60*60;
 const err=(message,status=400)=>{const e=new Error(message);e.status=status;throw e};
 const sha=s=>createHash('sha256').update(s).digest('hex');
@@ -75,14 +76,27 @@ async function execute(c,path,d,me,co){const id=co.id,u=me.id;
  const handlers={
   '/expense':L.addExpense,'/income':L.addIncome,'/opening':L.addOpening,'/journal':L.addManual,'/contact':L.addContact,
   '/invoice':L.addInvoice,'/invoice/payment':L.payInvoice,'/bill':L.addBill,'/bill/payment':L.payBill,
-  '/bank/import':L.importBank,'/bank/classify':L.classifyBank,'/bank/reconcile':L.reconcile
+  '/bank/import':L.importBank,'/bank/classify':L.classifyBank,'/bank/reconcile':L.reconcile,
+  '/bank/match':M.matchExisting
  };
  if(handlers[path])return {ok:true,id:await handlers[path](c,id,u,d)};
  if(path==='/journal/reverse')return {ok:true,id:await L.reverse(c,id,u,d.id,d.date)};
  if(path==='/account'){
   if(!['asset','liability','equity','income','expense'].includes(d.type))err('Invalid account type.');const code=String(d.code||'').trim(),name=String(d.name||'').trim();if(code.length<2||code.length>12||!name)err('Enter an account code and name.');const a=await L.one(c,'INSERT INTO accounts(company_id,code,name,type) VALUES($1,$2,$3,$4) RETURNING id',[id,code,name,d.type]);await L.audit(c,id,u,'account.create',code+' '+name);return {id:a.id};
  }
- if(path==='/lock'){if(d.confirm!=='LOCK')err('Type LOCK to confirm the accounting period close.');const newDate=L.iso(d.locked_through);const current=await L.one(c,'SELECT locked_through FROM companies WHERE id=$1 FOR UPDATE',[id]);if(current.locked_through&&newDate<current.locked_through)err('Cannot silently reopen locked history.');await c.query('UPDATE companies SET locked_through=$1 WHERE id=$2',[newDate,id]);await L.audit(c,id,u,'period.lock',newDate);return {ok:true};}
+ if(path==='/lock'){
+  if(d.confirm!=='LOCK')err('Type LOCK to confirm the accounting period close.');
+  const newDate=L.iso(d.locked_through);
+  if(newDate>L.today())err('You cannot close a future month.');
+  const current=await L.one(c,'SELECT locked_through FROM companies WHERE id=$1 FOR UPDATE',[id]);
+  if(current.locked_through&&newDate<=current.locked_through)err('Already locked: cannot silently reopen or relock historical periods.');
+  const check=await M.closeReadiness(c,id,newDate);
+  if(!check.ready)err('Resolve the bank review blockers before closing: '+check.blockers.join(' '));
+  if(check.requires_manual_bank_ack&&d.ack_manual_bank_review!==true)err('Acknowledge the missing bank reconciliation evidence before locking.');
+  await c.query('UPDATE companies SET locked_through=$1 WHERE id=$2',[newDate,id]);
+  await L.audit(c,id,u,'period.lock',newDate+'; bank imported='+check.bank.imported+'; reconciliations='+check.bank.reconciliations+'; acknowledged='+String(d.ack_manual_bank_review===true));
+  return {ok:true,closed_through:newDate};
+ }
  err('Unknown action.',404);
 }
 async function handle(req){const url=new URL(req.url);const path=url.pathname.replace(/^\/(?:\.netlify\/functions\/api|api)/,'')||'/';const method=req.method.toUpperCase();if(!['GET','POST'].includes(method))err('Method not allowed.',405);if(method==='POST')checkPost(req);
@@ -133,6 +147,10 @@ async function handle(req){const url=new URL(req.url);const path=url.pathname.re
   if(method==='POST'&&path==='/team/invite'){
    await c.query('BEGIN');inTx=true;const d=(await req.json()).data||{};const result=await createInvite(c,co,me,d);await c.query('COMMIT');inTx=false;return send(result);
   }
+  if(method==='GET'&&path==='/bank/match/candidates')
+   return send(await M.matchCandidates(c,co.id,url.searchParams.get('line_id')));
+  if(method==='GET'&&path==='/close/readiness')
+   return send(await M.closeReadiness(c,co.id,url.searchParams.get('end')||L.today()));
   if(method==='GET'&&path==='/state'){
    const dashboard=await L.dashboard(c,co.id);return send({company:co,accounts:await L.rows(c,'SELECT * FROM accounts WHERE company_id=$1 ORDER BY code',[co.id]),contacts:await L.rows(c,'SELECT * FROM contacts WHERE company_id=$1 ORDER BY name',[co.id]),dashboard,journals:await L.journals(c,co.id,250),invoices:await L.allInvoices(c,co.id),bills:await L.allBills(c,co.id),bank_lines:await L.bankLines(c,co.id),reconciliations:await L.rows(c,'SELECT r.*,a.name AS account_name FROM reconciliations r JOIN accounts a ON a.id=r.bank_account_id WHERE r.company_id=$1 ORDER BY r.id DESC',[co.id]),insights:await L.insights(c,co.id,dashboard)});
   }
