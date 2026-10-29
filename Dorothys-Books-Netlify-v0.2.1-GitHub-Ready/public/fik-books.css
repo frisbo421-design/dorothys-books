@@ -1,0 +1,103 @@
+/* FIK Books v0.4 — Financial instrument design system, not a marketing template.
+   Keep forms and ledger rows stable; movement belongs to orientation and data only. */
+:root{
+  --ink:#182724;--muted:#697772;--line:#dce3df;--paper:#f1f3f0;
+  --white:#fff;--sidebar:#0f1f1b;--orange:#e8621a;--sky:#78beca;--green:#146749;
+  --red:#a33d31;--mono:'IBM Plex Mono',monospace;--sans:'DM Sans',system-ui,sans-serif;
+  --serif:'Instrument Serif',Georgia,serif
+}
+html { scroll-behavior:auto }
+body{background:var(--paper);font-feature-settings:"ss01" on}
+::selection{background:#e8621a;color:#fff}
+:focus-visible{outline:2px solid var(--orange)!important;outline-offset:3px}
+.shell .sidebar{background:linear-gradient(163deg,#132923 0%,#0f201b 72%,#091b17 100%);width:250px;min-width:250px;padding:27px 14px 22px;border-right:1px solid #213a30;box-shadow:inset -1px 0 0 #1e332b}
+.shell .brand{gap:11px;padding-bottom:36px}
+.shell .brand-mark{border-radius:2px;width:37px;height:37px;font-family:var(--sans);font-size:21px;font-weight:900;letter-spacing:-.1em;background:var(--orange);padding:0 3px 0 0;transform:rotate(-3deg)}
+.shell .brand b{font-weight:800;letter-spacing:-.06em;font-size:17px}
+.shell .brand small{letter-spacing:.14em;color:#93a99f;font-weight:600}
+.shell .side-label{font-family:var(--mono);font-size:9px;color:#7b9a8d;letter-spacing:.095em}
+.shell .navgroup{gap:5px}
+.shell .nav{border-radius:3px;padding:11px 12px;color:#acbdb2;font-weight:500;letter-spacing:-.012em;position:relative;transition:background .18s ease,color .18s ease}
+.shell .nav:hover{background:#213a30}
+.shell .nav.active{background:#254237;color:#fff}
+.shell .nav.active::before{position:absolute;content:"";width:3px;top:7px;bottom:7px;left:0;background:var(--orange);border-radius:4px}
+.shell .side-bottom{border-top-color:#254139}
+.shell .workspace{background:radial-gradient(ellipse 1000px 460px at 100% -130px,rgba(120,190,202,.09),transparent 73%),var(--paper)}
+.shell .topbar{height:70px;background:rgba(255,255,255,.94);border-bottom-color:#d7dfd9;padding:0 clamp(18px,3vw,45px)}
+.shell .breadcrumbs{font-family:var(--mono);font-size:10px;letter-spacing:.015em;gap:10px}
+.shell .breadcrumbs strong{font-weight:600}
+.shell .company-choose{border-radius:3px;font-family:var(--mono);font-size:10px;background:#f8faf8}
+.shell .user-dot{border-radius:3px;background:#e1e9e2;color:#20352c;font-family:var(--mono)}
+.shell .content{padding:clamp(22px,3.5vw,44px) clamp(18px,3vw,45px) 90px;max-width:1760px}
+.shell .page-title{align-items:flex-end;margin-bottom:27px;gap:24px}
+.shell .page-title .overline{font:500 10px var(--mono);letter-spacing:.06em;color:#607e70;text-transform:none}
+.shell .page-title h1{font:750 clamp(36px,4vw,56px)/1.07 var(--sans);letter-spacing:-.065em;margin:9px 0 10px;color:#192a23}
+.shell .page-title p{font-size:13px;line-height:1.65;max-width:620px;color:#66796e}
+.shell .btn{border-radius:3px;padding:10px 15px;font-weight:650;transition:background .16s,border-color .16s,transform .16s}
+.shell .btn:hover:not(:disabled){transform:translateY(-1px)}
+.shell .btn.primary{background:#e8621a;border-color:#e8621a;color:#fff}
+.shell .btn.primary:hover{background:#c84f0f}
+.shell .btn.dark{background:#142820;border-color:#142820}
+.shell .cards{gap:10px;margin-bottom:14px}
+.shell .metric{border-radius:3px;border-color:#dee5de;padding:20px 20px 19px;min-height:154px;position:relative;overflow:hidden;transition:border-color .2s,box-shadow .2s}
+.shell .metric::after{content:"";position:absolute;height:1px;width:100%;bottom:0;left:0;background:#d8e5dc}
+.shell .metric.highlight{padding:20px 20px 19px;border:1px solid #e3d6c9;background:#fff9f5}
+.shell .metric.highlight::after{height:3px;background:var(--orange)}
+.shell .metric-label{font:500 10px/1.4 var(--mono);letter-spacing:-.025em;color:#52665b}
+.shell .metric-value{font:680 clamp(23px,2.45vw,34px)/1.08 var(--sans);letter-spacing:-.075em;margin:23px 0 8px;font-variant-numeric:tabular-nums}
+.shell .metric-foot{font-size:10px;color:#758379;line-height:1.5}
+.shell .metric:hover{border-color:#c7d3ca;box-shadow:0 14px 30px rgba(31,49,36,.035)}
+.shell .two-col{grid-template-columns:minmax(0,1.56fr) minmax(295px,.8fr);gap:14px}
+.shell .panel{border-radius:3px;border-color:#dbe3dc;box-shadow:0 3px 20px rgba(25,49,37,.018);margin-bottom:14px}
+.shell .panel-head{padding:19px 22px 17px;border-color:#e6ece6}
+.shell .panel-title{font-size:14px;letter-spacing:-.035em}
+.shell .panel-sub{font-size:11px;color:#6e8073}
+.shell .panel-body{padding:19px 22px}
+.shell .insight .bullet{border-radius:2px;background:#f6e7db;color:#a54a1b;font-family:var(--mono)}
+.shell .table-wrap{overscroll-behavior-x:contain}
+.shell table{font-variant-numeric:tabular-nums}
+.shell th{background:#f7f9f7;font:500 10px var(--mono);letter-spacing:.045em}
+.shell td{color:#35433a}
+.shell tr:hover td{background:#fbfcfa}
+.shell .status{border-radius:3px}
+.shell input,.shell select,.shell textarea{border-radius:3px}
+.shell .account-pill{border-color:#2a4638;border-radius:3px}
+.shell .private{font-size:10px}
+.shell .data-row{gap:15px}
+.shell .demo-banner{font-family:var(--mono);font-size:11px;letter-spacing:.01em}
+.fik-story-head{display:flex;gap:12px;align-items:center;justify-content:space-between;margin:-9px 0 23px}
+.fik-story-note{font:500 10px var(--mono);color:#647b6c;letter-spacing:.01em}
+.fik-story-pip{display:inline-block;height:7px;width:7px;background:#e8621a;border-radius:50%;margin-right:8px;box-shadow:0 0 0 4px rgba(232,98,26,.08)}
+.fik-story-detail{font-size:10px;color:#809084}
+.fik-chart{position:relative;width:100%;height:215px;outline:0;contain:layout style}
+.fik-chart-caption{font-size:10px;color:#7b8a80;padding:12px 0 0;display:flex;justify-content:space-between;gap:15px}
+.fik-chart-swatch{display:inline-block;width:8px;height:8px;margin-right:6px;border-radius:1px}
+.fik-chart-legend{white-space:nowrap}
+.fik-ledger-trail{font:500 10px var(--mono);color:#7e8d82;letter-spacing:.015em;padding:6px 0 2px}
+.fik-ledger-trail strong{color:#2b503e;font-weight:600}
+@media(max-width:1160px){
+  .shell .two-col{grid-template-columns:minmax(0,1fr)}
+  .shell .cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:750px){
+  .shell .sidebar{width:270px;min-width:270px}
+  .shell .content{padding:22px 15px 60px}
+  .shell .topbar{padding:0 15px;height:61px}
+  .shell .page-title{align-items:flex-start;flex-direction:column;gap:13px}
+  .shell .page-title h1{font-size:38px}
+  .shell .metric{min-height:134px;padding:17px!important}
+  .shell .metric-value{font-size:25px;margin-top:17px}
+  .shell .metric-label{font-size:9px}
+  .shell .panel-head{padding:15px 16px}
+  .shell .panel-body{padding:15px 16px}
+  .fik-story-head{flex-wrap:wrap}
+  .fik-chart{height:200px}
+}
+@media(max-width:380px){
+  .shell .cards{gap:7px}
+  .shell .metric-value{font-size:22px}
+}
+@media(prefers-reduced-motion:reduce){
+  html,body{scroll-behavior:auto!important}
+  *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+}
