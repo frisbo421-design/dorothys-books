@@ -111,3 +111,10 @@ body{background:var(--paper);font-feature-settings:"ss01" on}
 @media(max-width:880px){.fik-review-lane{flex-direction:column;align-items:stretch;gap:12px}.fik-review-title{flex:auto}.fik-review-items{gap:6px}}
 @media(max-width:490px){.fik-review-items{grid-template-columns:1fr}.fik-review-item{padding:8px 11px}}
 .bars[hidden]{display:none!important}
+
+/* Linking an already-registered owner is a separate, explicitly authenticated action. */
+.auth-right .existing-join{max-width:410px;margin:16px auto 0;padding:12px 15px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+.existing-join summary{cursor:pointer;font-weight:700;color:var(--ink);list-style:disclosure-closed}
+.existing-join[open] summary{margin-bottom:12px}
+.existing-join .auth-form{max-width:100%;box-shadow:none;border:0;padding:0}
+.existing-join .auth-form p{font-size:12px;color:var(--muted);line-height:1.6}
