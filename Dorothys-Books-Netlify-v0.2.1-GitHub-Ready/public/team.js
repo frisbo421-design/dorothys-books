@@ -20,7 +20,15 @@
       '<label class="form-label">NEW PASSWORD<input class="field" type="password" name="password" minlength="10" autocomplete="new-password" required></label>',
       '<button class="btn primary" style="width:100%;padding:14px" type="submit">Accept invitation and sign in</button>',
       '<p class="smallprint">This invitation expires after 7 days and works only once.</p>',
-      '<div id="invitationMessage" role="alert"></div></form></div></div>'
+      '<div id="invitationMessage" role="alert"></div></form>',
+      '<details class="existing-join"><summary>Already have a Dorothy’s Books account?</summary>',
+      '<form id="joinExistingInviteForm" class="auth-form">',
+      '<p>Sign in to your existing account to join this shared company. No financial records are copied or moved.</p>',
+      '<label class="form-label">INVITED EMAIL<input class="field" type="email" name="email" autocomplete="username" required></label>',
+      '<label class="form-label">EXISTING PASSWORD<input class="field" type="password" name="password" autocomplete="current-password" required></label>',
+      '<button class="btn primary" type="submit">Sign in & join shared books</button>',
+      '<div id="existingJoinMessage" role="alert"></div>',
+      '</form></details></div></div>'
     ].join('');
   };
 
@@ -92,6 +100,23 @@
       } catch (e) {
         document.getElementById('invitationMessage').textContent = e.message;
         button.disabled = false;
+      }
+      return;
+    }
+    if(event.target.id==='joinExistingInviteForm'){
+      event.preventDefault();event.stopImmediatePropagation();
+      const form=event.target,button=form.querySelector('button[type=submit]');
+      button.disabled=true;
+      try{
+        const d=Object.fromEntries(new FormData(form).entries());
+        await api('auth/login',{email:d.email,password:d.password});
+        const joined=await api('auth/invite/join',{token:inviteToken});
+        inviteToken='';
+        await rebootstrap(joined.company_id);
+        notify('You now share the same company books. Existing company records were not changed.');
+      }catch(e){
+        document.getElementById('existingJoinMessage').textContent=e.message;
+        button.disabled=false;
       }
       return;
     }
