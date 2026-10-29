@@ -28,7 +28,10 @@ async function createInvite(c,co,me,d){
  const email=String(d.email||'').trim().toLowerCase();
  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254)err('Enter the intended owner’s valid email address.');
  const existing=await L.one(c,'SELECT id FROM users WHERE email=$1',[email]);
- if(existing)err('This address already has an account. Contact the administrator to manage its access.',409);
+ if(existing){
+  const already=await L.one(c,`SELECT co.id FROM companies co LEFT JOIN company_memberships m ON m.company_id=co.id AND m.user_id=$2 WHERE co.id=$1 AND (co.owner_id=$2 OR m.user_id=$2)`,[co.id,existing.id]);
+  if(already)err('This account already has access to the company.',409);
+ }
  const token=randomBytes(32).toString('base64url');
  await c.query('UPDATE company_invitations SET expires_at=now() WHERE company_id=$1 AND email=$2 AND accepted_at IS NULL',[co.id,email]);
  await c.query('INSERT INTO company_invitations(company_id,email,role,token_hash,created_by) VALUES($1,$2,$3,$4,$5)',[co.id,email,'owner',sha(token),me.id]);
@@ -48,6 +51,20 @@ async function acceptInvite(c,d){
  await c.query('UPDATE company_invitations SET accepted_at=now() WHERE id=$1',[invite.id]);
  await L.audit(c,invite.company_id,created.id,'team.join',email+' joined as '+invite.role);
  return created.id;
+}
+
+
+async function joinExistingInvite(c,me,d){
+ const token=String(d.token||'');
+ if(token.length<32||token.length>200)err('This invitation link is invalid. Request a new link.',403);
+ const invite=await L.one(c,'SELECT * FROM company_invitations WHERE token_hash=$1 AND accepted_at IS NULL AND expires_at>now() FOR UPDATE',[sha(token)]);
+ if(!invite||invite.email!==me.email)err('This invitation is invalid, expired, or intended for another account.',403);
+ const present=await L.one(c,`SELECT co.id FROM companies co LEFT JOIN company_memberships m ON m.company_id=co.id AND m.user_id=$2 WHERE co.id=$1 AND (co.owner_id=$2 OR m.user_id=$2)`,[invite.company_id,me.id]);
+ if(present)err('You already belong to this company.',409);
+ await c.query('INSERT INTO company_memberships(company_id,user_id,role) VALUES($1,$2,$3)',[invite.company_id,me.id,invite.role]);
+ await c.query('UPDATE company_invitations SET accepted_at=now() WHERE id=$1',[invite.id]);
+ await L.audit(c,invite.company_id,me.id,'team.join-existing',me.email+' joined existing company');
+ return invite.company_id;
 }
 
 async function createSession(c,user){const token=randomBytes(36).toString('base64url');await c.query('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES($1,$2,$3)',[sha(token),user,Math.floor(Date.now()/1000)+TTL]);return cookie(token)}
@@ -86,6 +103,12 @@ async function handle(req){const url=new URL(req.url);const path=url.pathname.re
   }
   if(method==='POST'&&path==='/auth/invite/accept'){
    await c.query('BEGIN');inTx=true;const d=(await req.json()).data||{};const user=await acceptInvite(c,d);const token=await createSession(c,user);await c.query('COMMIT');inTx=false;return send({ok:true},200,{'Set-Cookie':token});
+  }
+  if(method==='POST'&&path==='/auth/invite/join'){
+   if(!me)err('Sign in with your existing Books account before joining.',401);
+   await c.query('BEGIN');inTx=true;const d=(await req.json()).data||{};
+   const companyId=await joinExistingInvite(c,me,d);
+   await c.query('COMMIT');inTx=false;return send({ok:true,company_id:companyId});
   }
   if(method==='POST'&&path==='/auth/logout'){
    const t=cookieValue(req,'db_session');if(t)await c.query('DELETE FROM sessions WHERE token_hash=$1',[sha(t)]);return send({ok:true},200,{'Set-Cookie':cookie('',0)});
