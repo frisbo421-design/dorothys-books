@@ -59,8 +59,9 @@ export async function matchExisting(c,co,user,payload){
 }
 export async function closeReadiness(c,co,endDate){
  const end=L.iso(endDate);
- const endDay=new Date(end+'T12:00:00Z');endDay.setUTCMonth(endDay.getUTCMonth()+1);endDay.setUTCDate(0);
- if(end!==endDay.toISOString().slice(0,10))deny('Choose the last day of the month for month-end close.');
+ const [y,m]=end.split('-').map(Number);
+ const monthEnd=new Date(Date.UTC(y,m,0)).toISOString().slice(0,10);
+ if(end!==monthEnd)deny('Choose the last day of the month for month-end close.');
  const company=await L.one(c,'SELECT id,locked_through FROM companies WHERE id=$1',[co]);
  if(!company)deny('Company not found.');
  const periodStart=end.slice(0,7)+'-01';
