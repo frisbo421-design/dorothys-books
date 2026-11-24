@@ -13,7 +13,27 @@ function notify(text,error=false){toastEl.innerHTML=`<div class="toast" style="$
 async function api(path,data){let options={method:data===undefined?'GET':'POST',credentials:'same-origin',headers:{'X-Requested-With':'DorothysBooks','X-Company-Id':String(companyId)}};if(data!==undefined){options.headers['Content-Type']='application/json';options.body=JSON.stringify({data})};let r=await fetch('/api/'+path,options);let j=await r.json().catch(()=>({error:'Server error'}));if(!r.ok)throw Error(j.error||'Request failed');return j}
 async function refresh(){books=await api('state');render()}
 async function init(){try{boot=await api('bootstrap');if(boot.user){let cs=boot.companies;if(!cs.some(x=>x.id===companyId))companyId=cs[0]?.id||0;localStorage.setItem('db_company_id',String(companyId));if(companyId)await refresh();else render()}else renderAuth()}catch(e){root.innerHTML=`<div class="auth-right" style="min-height:100vh"><div class="auth-form"><h2>Couldn't open your books.</h2><p>${esc(e.message)}. Make sure Netlify Database is enabled and the site is deployed correctly.</p><button class="btn primary" data-action="retry">Try again</button></div></div>`}}
-function renderAuth(){const setup=boot?.setup;root.innerHTML=`<div class="auth-bg"><div class="auth-story"><div class="brand" style="padding:0"><span class="brand-mark">D</span><div><b>Dorothy’s Books</b><small>Finance, in focus</small></div></div><div><div class="eyebrow" style="margin-bottom:20px">ACCOUNTING MADE CLEAR</div><h1>Financial clarity.<br>Without the <em>guesswork.</em></h1></div><p>One shared company ledger, with posted transactions, account history, and the evidence behind every number.</p></div><div class="auth-right"><form id="authForm" class="auth-form"><div class="overline">PRIVATE FINANCIAL WORKSPACE</div><h2>${setup?'Set up your books.':'Welcome back.'}</h2><p>${setup?'Create the owner account. Records are stored in your private Netlify database, not in this browser.':'Sign in to continue to your bookkeeping workspace.'}</p><label class="form-label">EMAIL ADDRESS<input class="field" name="email" type="email" placeholder="you@business.com" autocomplete="username" required/></label><label class="form-label">PASSWORD<input class="field" name="password" type="password" ${setup?'minlength="10"':''} placeholder="${setup?'At least 10 characters':'Your password'}" autocomplete="${setup?'new-password':'current-password'}" required/></label>${setup?'<label class="form-label">OWNER SETUP CODE<input class="field" name="setup_key" type="password" placeholder="Netlify BOOKS_SETUP_KEY" autocomplete="off" required/></label>':''}<button type="submit" class="btn primary" style="width:100%;padding:14px">${setup?'Create private workspace':'Sign in'} ${svg('arrow')}</button><div class="note" style="margin-top:28px">${svg('lock')} Private by default. No bank or payment systems are connected, and no customer charges can be made from this app.</div></form></div></div>`}
+function renderAuth(){
+ const setup=boot?.setup;
+ const fields=setup?
+  '<label class="form-label">OWNER EMAIL<input class="field" name="email" type="email" autocomplete="username" required></label>'+
+  '<label class="form-label">OWNER PASSWORD<input class="field" name="password" type="password" minlength="10" autocomplete="new-password" required></label>'+
+  '<label class="form-label">OWNER SETUP CODE<input class="field" name="setup_key" type="password" autocomplete="off" required></label>'
+  :'<label class="form-label" for="booksPIN">ACCESS PIN<input class="field db-pin-input" id="booksPIN" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" autocomplete="off" placeholder="••••" aria-describedby="booksPinHelp" required autofocus></label>'+
+   '<p class="db-pin-help" id="booksPinHelp">Enter the four-digit Books PIN to open your complete accounting workspace.</p>';
+ root.innerHTML='<div class="auth-bg">'+
+  '<div class="auth-story"><div class="brand" style="padding:0"><span class="brand-mark">D</span><div><b>Dorothy’s Books</b><small>Finance, in focus</small></div></div>'+
+  '<div><div class="eyebrow" style="margin-bottom:20px">ACCOUNTING MADE CLEAR</div><h1>Financial clarity.<br>Without the <em>guesswork.</em></h1></div>'+
+  '<p>One shared company ledger, with posted transactions, account history, and the evidence behind every number.</p></div>'+
+  '<div class="auth-right"><form id="authForm" class="auth-form">'+
+  '<div class="overline">PRIVATE FINANCIAL WORKSPACE</div><h2>'+(setup?'Set up your books.':'Your books. One PIN.')+'</h2>'+
+  '<p>'+(setup?'Create the original owner account once. After setup, this screen uses PIN access.':'No second email or password. Enter your PIN to open the actual Books application.')+'</p>'+
+  fields+
+  '<button type="submit" class="btn primary db-pin-submit">'+(setup?'Create private workspace':'Unlock Dorothy’s Books')+' '+svg('arrow')+'</button>'+
+  '<div class="note" style="margin-top:28px">'+svg('lock')+' Private financial records. PIN attempts are limited and access expires after eight hours. A shared PIN does not identify which owner entered it.</div>'+
+  '</form></div></div>';
+ if(!setup)root.querySelector('#booksPIN')?.focus();
+}
 function headline(title,subtitle,buttons='',overline='DOROTHY’S PETCARE · FINANCE'){return `<div class="page-title"><div><div class="overline">${overline}</div><h1>${esc(title)}</h1><p>${esc(subtitle)}</p></div><div class="actions">${buttons}</div></div>`}
 const btn=(text,act,kind='',extra='')=>`<button class="btn ${kind}" data-action="${act}" ${extra}>${text}</button>`;
 const empty=(title,detail,button='')=>`<div class="empty"><div class="empty-icon">${svg('folder')}</div><b>${esc(title)}</b><p>${esc(detail)}</p>${button}</div>`;
@@ -109,7 +129,7 @@ async function submitModal(form){let kind=modal.split(':')[0],id=+modal.split(':
  let result=await api(target,d);if(kind==='company'){await rebootstrap(result.id);section='overview'}else{await refresh()}
  if(kind==='import'){notify(`Imported ${result.id.imported} new rows; ${result.id.duplicates} duplicate(s) skipped.`)}else notify('Saved to your books.');
  importing=null;modal='';render();}
-function handleSubmit(e){if(e.target.id==='authForm'){e.preventDefault();if(busy)return;busy=true;let d=dataFrom(e.target);api(boot.setup?'auth/register':'auth/login',d).then(()=>rebootstrap()).catch(x=>notify(x.message,true)).finally(()=>busy=false);return}
+function handleSubmit(e){if(e.target.id==='authForm'){e.preventDefault();if(busy)return;let d=dataFrom(e.target);if(!boot?.setup&&!/^\d{4}$/.test(String(d.pin||''))){notify('Enter a four-digit PIN.',true);return}busy=true;api(boot.setup?'auth/register':'auth/pin',d).then(()=>rebootstrap()).catch(x=>{notify(x.message,true);const pin=e.target.querySelector('[name=pin]');if(pin){pin.value='';pin.focus()}}).finally(()=>busy=false);return}
  if(e.target.id==='createCompany'){e.preventDefault();let d=dataFrom(e.target);api('company',d).then(r=>rebootstrap(r.id)).catch(x=>notify(x.message,true));return}
  if(e.target.id==='modalForm'){e.preventDefault();if(busy)return;busy=true;let button=e.target.querySelector('[type="submit"]');if(button)button.disabled=true;submitModal(e.target).catch(e=>notify(e.message,true)).finally(()=>{busy=false;if(button)button.disabled=false});}}
 document.addEventListener('submit',handleSubmit);

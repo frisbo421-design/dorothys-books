@@ -3,6 +3,7 @@
 import { getDatabase } from '@netlify/database';
 import { pbkdf2Sync, randomBytes, createHash, timingSafeEqual } from 'node:crypto';
 import * as L from '../../backend/ledger.mjs';
+import * as PIN from '../../backend/pin-access.mjs';
 import * as TAX from '../../backend/tax-readiness.mjs';
 import * as M from '../../backend/close-and-match.mjs';
 const TTL=14*24*60*60;
@@ -69,7 +70,46 @@ async function joinExistingInvite(c,me,d){
  return invite.company_id;
 }
 
-async function createSession(c,user){const token=randomBytes(36).toString('base64url');await c.query('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES($1,$2,$3)',[sha(token),user,Math.floor(Date.now()/1000)+TTL]);return cookie(token)}
+async function createSession(c,user,ttl=TTL){const token=randomBytes(36).toString('base64url');await c.query('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES($1,$2,$3)',[sha(token),user,Math.floor(Date.now()/1000)+ttl]);return cookie(token,ttl)}
+
+/** Shared owner PIN entry. Authentication attempts are serialized and persisted
+ * across Netlify function instances, not counted in process memory.
+ * The public four-digit PIN is protected by BOTH IP-level and global rate caps.
+ * PIN sessions are intentionally marked as shared, not individual attribution. */
+function secret(name){return Netlify.env.get(name)||process.env[name]||''}
+function requesterIp(req){return req.headers.get('x-nf-client-connection-ip')||req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()||'unknown'}
+async function enterPin(c,req,d){
+ const expected=secret('BOOKS_ACCESS_PIN'),pepper=secret('BOOKS_PIN_PEPPER');
+ if(!PIN.validPin(expected)||pepper.length<24)err('PIN access has not been configured for this site.',503);
+ const companies=await L.rows(c,"SELECT id,owner_id FROM companies WHERE demo=FALSE ORDER BY id LIMIT 2");
+ if(companies.length!==1)err('A single live Books company must be configured for PIN access.',503);
+ const company=companies[0];
+ const memberships=await L.one(c,"SELECT COUNT(*)::int AS n FROM company_memberships WHERE company_id=$1",[company.id]);
+ if(Number(memberships?.n||0)>1)err('PIN access supports at most two owner accounts; review company memberships.',503);
+ const scopes=[['global',PIN.GLOBAL_MAX_FAILURES],[PIN.ipScope(requesterIp(req),pepper),PIN.IP_MAX_FAILURES]];
+ const rows=[];
+ const now=Date.now();
+ for(const [scope,limit] of scopes){
+   await c.query('INSERT INTO books_pin_attempts(scope) VALUES($1) ON CONFLICT DO NOTHING',[scope]);
+   const row=await L.one(c,'SELECT failure_count,window_start,locked_until FROM books_pin_attempts WHERE scope=$1 FOR UPDATE',[scope]);
+   rows.push({scope,limit,row});
+ }
+ if(rows.some(({row})=>PIN.state(row,now).locked))return {ok:false,status:429};
+ const correct=PIN.verifyPin(d.pin,expected,pepper);
+ for(const {scope,limit,row} of rows){
+   const old=PIN.state(row,now);
+   const n=correct?0:old.count+1;
+   const mustLock=!correct&&n>=limit;
+   const activeWindow=new Date(row.window_start).getTime();
+   const newWindow=correct||!(now-activeWindow>=0&&now-activeWindow<PIN.WINDOW_MS);
+   await c.query('UPDATE books_pin_attempts SET failure_count=$2,window_start=CASE WHEN $3 THEN now() ELSE window_start END,locked_until=$4 WHERE scope=$1',
+     [scope,n,newWindow,mustLock?new Date(now+PIN.LOCK_MS).toISOString():null]);
+ }
+ if(!correct)return {ok:false,status:rows.some(x=>PIN.state(x.row,now).count+1>=x.limit)?429:401};
+ const session=await createSession(c,company.owner_id,PIN.PIN_SESSION_SECONDS);
+ await L.audit(c,company.id,company.owner_id,'auth.pin.shared','Shared owner PIN session opened. Individual person not verified by PIN.');
+ return {ok:true,session};
+}
 async function report(c,co,url){const kind=url.searchParams.get('kind')||'pnl',end=url.searchParams.get('end')||isoToday(),start=url.searchParams.get('start')||end.slice(0,7)+'-01';if(kind==='pnl')return L.pnl(c,co.id,start,end);if(kind==='balance')return L.balanceSheet(c,co.id,end);if(kind==='trial')return {entries:await L.trial(c,co.id,end),as_of:L.iso(end)};if(kind==='general')return {entries:await L.rows(c,`SELECT j.id,j.date,j.memo,j.source_type,a.code,a.name AS account,a.type,l.debit,l.credit FROM journal_entries j JOIN journal_lines l ON l.entry_id=j.id JOIN accounts a ON a.id=l.account_id WHERE j.company_id=$1 AND j.date BETWEEN $2 AND $3 ORDER BY j.date DESC,j.id DESC,l.id`,[co.id,L.iso(start),L.iso(end)]),start,end};err('Unknown report type.')}
 function csvValue(x){let s=String(x??'');if(/^[=+@\-\t\r]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"'}
 function csvReport(kind,result){let data=[];if(kind==='pnl')data=[...result.income.map(x=>({section:'Income',account:x.name,amount_usd:(x.amount/100).toFixed(2)})),...result.expense.map(x=>({section:'Expenses',account:x.name,amount_usd:(x.amount/100).toFixed(2)}))];else if(kind==='balance')data=[...result.assets.map(x=>({section:'Assets',account:x.name,amount_usd:(x.balance/100).toFixed(2)})),...result.liabilities.map(x=>({section:'Liabilities',account:x.name,amount_usd:(x.balance/100).toFixed(2)})),...result.equity.map(x=>({section:'Equity',account:x.name,amount_usd:(x.balance/100).toFixed(2)}))];else data=result.entries;const keys=data.length?Object.keys(data[0]):['account','amount_usd'];const csv=[keys.map(csvValue).join(','),...data.map(row=>keys.map(k=>csvValue(row[k])).join(','))].join('\r\n')+'\r\n';return new Response(csv,{status:200,headers:{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':`attachment; filename="dorothys-${kind}.csv"`,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}})}
@@ -111,6 +151,14 @@ async function handle(req){const url=new URL(req.url);const path=url.pathname.re
   }
   if(method==='POST'&&path==='/auth/register'){
    await c.query('BEGIN');inTx=true;const d=(await req.json()).data||{};const user=await register(c,d);const token=await createSession(c,user);await c.query('COMMIT');inTx=false;return send({ok:true},200,{'Set-Cookie':token});
+  }
+  if(method==='POST'&&path==='/auth/pin'){
+    await c.query('BEGIN');inTx=true;
+    const d=(await req.json()).data||{};
+    const result=await enterPin(c,req,d);
+    await c.query('COMMIT');inTx=false;
+    if(!result.ok)err(result.status===429?'Too many attempts. Try again later.':'Incorrect PIN.',result.status);
+    return send({ok:true},200,{'Set-Cookie':result.session});
   }
   if(method==='POST'&&path==='/auth/login'){
    const d=(await req.json()).data||{};const user=await L.one(c,'SELECT * FROM users WHERE email=$1',[String(d.email||'').trim().toLowerCase()]);if(!user||!passwordOk(String(d.password||''),user.password_hash))err('Incorrect email or password.',401);
