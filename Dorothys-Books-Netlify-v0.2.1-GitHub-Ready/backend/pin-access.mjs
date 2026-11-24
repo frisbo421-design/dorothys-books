@@ -10,7 +10,7 @@ export const IP_MAX_FAILURES = 5;
 export const GLOBAL_MAX_FAILURES = 30;
 export const PIN_SESSION_SECONDS = 8 * 60 * 60;
 
-export function validPin(raw) { return typeof raw === 'string' && /^\\d{4}$/.test(raw); }
+export function validPin(raw) { return typeof raw === 'string' && /^\d{4}$/.test(raw); }
 
 export function verifyPin(input, expected, pepper) {
   if (!validPin(expected) || !pepper || typeof pepper !== 'string' || pepper.length < 24) return false;
