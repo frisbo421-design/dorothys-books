@@ -21,7 +21,7 @@
     if(scroll){scroll.destroy();scroll=null}
   }
   function setupScroll(){
-    if(mq.matches||coarse.matches||!window.Lenis||!window.gsap){cleanupScroll();return}
+    if(section!=='overview'||mq.matches||coarse.matches||!window.Lenis||!window.gsap){cleanupScroll();return}
     if(scroll)return;
     scroll=new window.Lenis({
       autoRaf:false,
@@ -62,7 +62,7 @@
   }
   function tellStory(){
     const main=document.querySelector('.shell .content');
-    if(!main||!books||!books.dashboard)return;
+    if(!main||!books||!books.dashboard||main.querySelector('.ob-header'))return;
     const label=document.createElement('div');
     label.className='fik-story-head';
     const month=String(books.dashboard.month||'Current period');
@@ -128,6 +128,18 @@
     if(window.ScrollTrigger)window.gsap.registerPlugin(window.ScrollTrigger);
     const scope=document.querySelector('.shell .workspace');if(!scope)return;
     animationScope=window.gsap.context(()=>{
+      if(scope.querySelector('.ob-stage')){
+        window.gsap.from('.ob-header h1',{y:14,opacity:0,duration:.42,ease:'power2.out',clearProps:'all'});
+        window.gsap.from('.ob-stage-label,.ob-stage-value,.ob-stage-description',{y:10,opacity:0,duration:.45,stagger:.075,ease:'power2.out',clearProps:'all'});
+        window.gsap.from('.ob-flow-fill',{scaleX:0,transformOrigin:'left center',duration:.82,stagger:.1,ease:'power2.out',clearProps:'transform'});
+        window.gsap.from('.ob-measure',{y:8,opacity:0,duration:.35,stagger:.05,ease:'power2.out',clearProps:'all'});
+        if(window.ScrollTrigger){
+          scope.querySelectorAll('.ob-analysis,.ob-review,.ob-ledger').forEach(element=>{
+            window.gsap.from(element,{y:12,opacity:0,duration:.43,ease:'power2.out',scrollTrigger:{trigger:element,start:'top 94%',once:true},clearProps:'all'});
+          });
+        }
+        return;
+      }
       window.gsap.from('.page-title h1',{y:14,opacity:0,duration:.48,ease:'power2.out',clearProps:'all'});
       window.gsap.from('.cards .metric',{y:11,opacity:0,duration:.42,stagger:.07,ease:'power2.out',clearProps:'all'});
       const panels=scope.querySelectorAll('.panel');
