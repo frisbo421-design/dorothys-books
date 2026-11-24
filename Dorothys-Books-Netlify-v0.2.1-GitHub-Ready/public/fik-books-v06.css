@@ -245,3 +245,6 @@ body {font-family:var(--sans);letter-spacing:-.009em}
   .ob-flow-fill,.ob-review-arrow,.ob-measure em {transition:none!important;animation:none!important;transform:none!important}
   .ob-command-backdrop {backdrop-filter:none}
 }
+
+.ob-chart-empty{min-height:294px;display:grid;place-content:center;text-align:center;border:1px dashed #dce5d9;background:#f7f9f6;color:#718473;font-size:13px;line-height:1.6;border-radius:4px;padding:25px}
+@media(max-width:470px){.ob-chart-empty{min-height:225px}}
