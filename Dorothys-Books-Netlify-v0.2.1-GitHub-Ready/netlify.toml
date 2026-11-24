@@ -14,3 +14,18 @@
     X-Frame-Options = "DENY"
     Cache-Control = "no-store"
     Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+
+# Snout Main is the sole normal finance entry point.
+# The user is already signed in to Snout; its verified admin check plus PIN remain authoritative.
+# Preserve the historic accounting editor only for controlled migration of write workflows.
+[[redirects]]
+  from = "/"
+  to = "https://neon-souffle-0f1969.netlify.app/snout/finance"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/legacy-editor"
+  to = "/index.html"
+  status = 200
+
