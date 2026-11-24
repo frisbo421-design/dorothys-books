@@ -4,13 +4,13 @@ import {readFileSync} from 'node:fs';
 
 const read = path => readFileSync(new URL(path, import.meta.url), 'utf8');
 
-test('Standalone home enters existing Snout Finance PIN workspace, no secondary Books login', () => {
+test('Standalone Books homepage remains accessible, with no forced redirect to Snout', () => {
  const toml = read('../netlify.toml');
- const redirects = toml.slice(toml.indexOf('[[redirects]]'));
- assert.match(redirects, /from = "\/"/);
- assert.match(redirects, /to = "https:\/\/neon-souffle-0f1969\.netlify\.app\/snout\/finance"/);
- assert.match(redirects, /status = 302/);
- assert.match(redirects, /force = true/);
+ assert.doesNotMatch(toml, /from = "\/"\s+to = "https:\/\/neon-souffle/);
+ assert.doesNotMatch(toml, /status = 302/);
+ const html = read('../public/index.html');
+ assert.match(html, /<div id="app">/);
+ assert.match(html, /\/app\.js\?v=2/);
 });
 
 test('Legacy editor stays accessible for controlled write migration, and accounting API paths remain independent', () => {
