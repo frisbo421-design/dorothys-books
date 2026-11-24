@@ -26,7 +26,7 @@ test('company access requires creator or authorized membership',()=>{
 });
 test('private invite UX loads with signup code never required for Darius',()=>{
  const html=source('../public/index.html'),js=source('../public/team.js');
- assert.match(html,/team\.js\?v=3/);
+ assert.match(html,/team\.js\?v=4/);
  assert.match(js,/new URLSearchParams\(location.hash.slice\(1\)\)/);
  assert.match(js,/history.replaceState/);
  assert.match(js,/renderAuth = function/);
