@@ -106,7 +106,13 @@
     ['Record expense','expense','action'],['Add journal entry','journal','action']
   ];
 
-  function closeCommand() { document.getElementById('obCommand')?.remove(); }
+  let commandTrigger = null;
+  function closeCommand(restoreFocus=true) {
+    const existed = document.getElementById('obCommand');
+    existed?.remove();
+    if (existed && restoreFocus && commandTrigger?.isConnected) commandTrigger.focus();
+    commandTrigger=null;
+  }
   function renderCommands(filter) {
     const list = document.getElementById('obCommandResults');
     if(!list)return;
@@ -117,7 +123,8 @@
   }
   function openCommand() {
     if(!boot?.user||!books)return;
-    closeCommand();
+    closeCommand(false);
+    commandTrigger=document.activeElement;
     const layer=document.createElement('div');
     layer.id='obCommand';layer.className='ob-command-layer';
     layer.innerHTML="<div class='ob-command-backdrop' data-ob-close></div><div class='ob-command' role='dialog' aria-modal='true' aria-label='Search workspace'>"+
@@ -129,7 +136,7 @@
   }
   const originalRender=render;
   render=function(){
-    closeCommand();
+    closeCommand(false);
     originalRender();
     if(!boot?.user||!books)return;
     const bar=document.querySelector('.shell .top-actions');
@@ -160,6 +167,14 @@
     if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'){
       event.preventDefault();event.stopImmediatePropagation();openCommand();return;
     }
-    if(event.key==='Escape'&&document.getElementById('obCommand')){event.preventDefault();event.stopImmediatePropagation();closeCommand()}
+    const dialog=document.getElementById('obCommand');
+    if(dialog && event.key==='Tab'){
+      const controls=[...dialog.querySelectorAll('input,button')].filter(x=>!x.disabled);
+      const first=controls[0],last=controls[controls.length-1];
+      if(event.shiftKey && document.activeElement===first){event.preventDefault();last?.focus()}
+      else if(!event.shiftKey && document.activeElement===last){event.preventDefault();first?.focus()}
+      return;
+    }
+    if(event.key==='Escape'&&dialog){event.preventDefault();event.stopImmediatePropagation();closeCommand()}
   },true);
 })();
