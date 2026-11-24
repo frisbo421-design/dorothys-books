@@ -6,6 +6,7 @@ import { getDatabase } from '@netlify/database';
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import * as L from '../../backend/ledger.mjs';
+import * as TAX from '../../backend/tax-readiness.mjs';
 
 const FIREBASE_PROJECT_ID = 'daycare-tracker-df21d';
 const JSON_HEADERS = {
@@ -24,7 +25,8 @@ export default async function handler(req) {
   const url = new URL(req.url);
   const isState = url.pathname==='/snout-books/state';
   const isReport = url.pathname==='/snout-books/report';
-  if(!isState&&!isReport) return friendlyError(404,'NOT_FOUND','Unknown read-only endpoint.');
+  const isTax = url.pathname==='/snout-books/tax-working-paper';
+  if(!isState&&!isReport&&!isTax) return friendlyError(404,'NOT_FOUND','Unknown read-only endpoint.');
   const authorization = req.headers.get('authorization')||'';
   if(!authorization.startsWith('Bearer ')) return friendlyError(401,'AUTH_REQUIRED','Sign in to Snout with an authorized account.');
   let decoded;
@@ -50,6 +52,11 @@ export default async function handler(req) {
       WHERE co.demo=FALSE AND (co.owner_id=$1 OR cm.user_id=$1)
       ORDER BY co.id LIMIT 1`,[user.id]);
     if(!company) return friendlyError(403,'COMPANY_NOT_LINKED','No accessible live Books company is linked to this email.');
+    if(isTax) {
+      const year=url.searchParams.get('year')||String(new Date().getUTCFullYear());
+      const workingPaper=await TAX.taxWorkingPaper(c,company.id,year);
+      return respond({ok:true,company,working_paper:workingPaper});
+    }
     if(isReport) {
       const kind=url.searchParams.get('kind')||'pnl';
       const end=url.searchParams.get('end')||L.today();
@@ -72,4 +79,4 @@ export default async function handler(req) {
   } finally {if(c)c.release()}
 }
 
-export const config={path:['/snout-books/state','/snout-books/report']};
+export const config={path:['/snout-books/state','/snout-books/report','/snout-books/tax-working-paper']};

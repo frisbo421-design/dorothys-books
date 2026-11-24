@@ -15,5 +15,7 @@ test('Snout bridge is read-only, Firebase verified, and company membership scope
 test('Bridge has no browser CORS enablement or cacheable response',()=>{
   assert.match(code,/'Cache-Control':'no-store, private'/);
   assert.doesNotMatch(code,/Access-Control-Allow-Origin/);
-  assert.match(code,/path:\['\/snout-books\/state','\/snout-books\/report'\]/);
+  assert.match(code,/path:\['\/snout-books\/state','\/snout-books\/report','\/snout-books\/tax-working-paper'\]/);
+  assert.match(code,/TAX\.taxWorkingPaper\(c,company\.id,year\)/);
+  assert.match(code,/working_paper:workingPaper/);
 });
