@@ -20,7 +20,9 @@
     const d = books.dashboard;
     const p = d.pnl;
     const revenue = amount(p.revenue), expenses = amount(p.expenses), profit = amount(p.profit);
-    const ratio = revenue > 0 ? clamp(expenses / revenue * 100) : 0;
+    const widthScale = Math.max(1, Math.abs(revenue), Math.abs(expenses));
+    const revenueWidth = clamp(Math.max(0,revenue) / widthScale * 100);
+    const ratio = clamp(Math.max(0,expenses) / widthScale * 100);
     const margin = pct(profit, revenue);
     const negative = profit < 0;
     const hasEntries = Array.isArray(d.recent) && d.recent.length > 0;
@@ -47,7 +49,7 @@
         "</div>",
         "<div class='ob-stage-flow'><div class='ob-flow-head'><span>HOW THE MONTH ADDS UP</span><span>USD · POSTED JOURNALS</span></div>",
           "<div class='ob-flow-step'><div class='ob-flow-label'><span>Recognized revenue</span><strong>",money(revenue),"</strong></div>",
-            "<div class='ob-flow-track'><span class='ob-flow-fill ob-fill-revenue' style='--ob-target:100%'></span></div><small>",incomeLabel,"</small></div>",
+            "<div class='ob-flow-track'><span class='ob-flow-fill ob-fill-revenue' style='--ob-target:",revenueWidth,"%'></span></div><small>",incomeLabel,"</small></div>",
           "<div class='ob-flow-join' aria-hidden='true'><span></span><span></span><span></span></div>",
           "<div class='ob-flow-step'><div class='ob-flow-label'><span>Operating expenses</span><strong>",money(expenses),"</strong></div>",
             "<div class='ob-flow-track'><span class='ob-flow-fill ob-fill-expenses' style='--ob-target:",ratio,"%'></span></div>",
