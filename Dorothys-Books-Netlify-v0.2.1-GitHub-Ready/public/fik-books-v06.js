@@ -26,6 +26,7 @@
     const margin = pct(profit, revenue);
     const negative = profit < 0;
     const hasEntries = Array.isArray(d.recent) && d.recent.length > 0;
+    const graph = Array.isArray(d.trend) && d.trend.length ? trendChart(d.trend) : "<div class='ob-chart-empty'>No monthly trend yet. Post real transactions to build a financial history.</div>";
     const incomeLabel = revenue > 0 ? 'From posted income' : 'No revenue posted for this period';
     const profitLabel = negative ? 'OPERATING DEFICIT' : 'OPERATING RESULT';
     const reviewItems = [
@@ -69,7 +70,7 @@
         "<div class='ob-analysis-main'><div class='ob-section-heading'><div><div class='ob-section-index'>THE TREND</div>",
           "<h2>Six months, one picture.</h2><p>Every bar is calculated from posted journal activity.</p></div>",
           "<button class='ob-text-action' data-nav='reports' type='button'>Open full reports <span aria-hidden='true'>↗</span></button></div>",
-          "<div class='ob-chart-frame'>",trendChart(d.trend),"</div>",
+          "<div class='ob-chart-frame'>",graph,"</div>",
           "<div class='ob-chart-source'>REVENUE / EXPENSES / OPERATING RESULT <span>MONTHLY POSTED ENTRIES</span></div></div>",
         "<div class='ob-analysis-side'><div class='ob-section-index'>OPEN OBLIGATIONS</div><h2>What is still owed?</h2>",
           "<p>Open customer and vendor balances. These are obligations, not money already received or paid.</p>",
