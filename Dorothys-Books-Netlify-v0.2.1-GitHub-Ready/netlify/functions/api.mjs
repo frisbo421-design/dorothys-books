@@ -3,6 +3,7 @@
 import { getDatabase } from '@netlify/database';
 import { pbkdf2Sync, randomBytes, createHash, timingSafeEqual } from 'node:crypto';
 import * as L from '../../backend/ledger.mjs';
+import * as TAX from '../../backend/tax-readiness.mjs';
 import * as M from '../../backend/close-and-match.mjs';
 const TTL=14*24*60*60;
 const err=(message,status=400)=>{const e=new Error(message);e.status=status;throw e};
@@ -154,6 +155,8 @@ async function handle(req){const url=new URL(req.url);const path=url.pathname.re
   if(method==='GET'&&path==='/state'){
    const dashboard=await L.dashboard(c,co.id);return send({company:co,accounts:await L.rows(c,'SELECT * FROM accounts WHERE company_id=$1 ORDER BY code',[co.id]),contacts:await L.rows(c,'SELECT * FROM contacts WHERE company_id=$1 ORDER BY name',[co.id]),dashboard,journals:await L.journals(c,co.id,250),invoices:await L.allInvoices(c,co.id),bills:await L.allBills(c,co.id),bank_lines:await L.bankLines(c,co.id),reconciliations:await L.rows(c,'SELECT r.*,a.name AS account_name FROM reconciliations r JOIN accounts a ON a.id=r.bank_account_id WHERE r.company_id=$1 ORDER BY r.id DESC',[co.id]),insights:await L.insights(c,co.id,dashboard)});
   }
+  if(method==='GET'&&path==='/tax/working-paper')
+    return send(await TAX.taxWorkingPaper(c,co.id,url.searchParams.get('year')||String(new Date().getUTCFullYear())));
   if(method==='GET'&&path==='/report')return send(await report(c,co,url));
   if(method==='GET'&&path==='/export'){const kind=url.searchParams.get('kind')||'general';return csvReport(kind,await report(c,co,url));}
   if(method==='GET'&&path==='/audit')return send({events:await L.rows(c,'SELECT action,detail,created_at FROM audit WHERE company_id=$1 ORDER BY id DESC LIMIT 200',[co.id])});
